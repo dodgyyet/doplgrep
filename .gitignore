@@ -2,8 +2,8 @@
 *.png
 *.jpg
 *.jpeg
-data/
-embeddings/
+images/
+databases/
 *.sqlite
 *.db
 

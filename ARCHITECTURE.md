@@ -1,14 +1,14 @@
 Name: Doplgrep CLI Tool (Min-Max Demo)
 Platform: macOS (Apple Silicon)
 Disk: ~2 TB available
-Dataset: FFHQ subset (~200–400k images for initial demo only)
-Input constraint: single, unblurred faces only
+Demo dataset: ipoc_mugshots
+Input constraint: single, unblurred faces only, not AI generated, not celebs, clean background
 Model: DINOv3 ViT-L
 Inference: PyTorch MPS, bf16
 Embedding: 1024-dimensional
-Vector DB: SQLite + sqlite-vec (prebuilt demo DB, read-only)
+Vector DB: SQLite + sqlite-vec 
 Distance metric: cosine
-Algorithm: HNSW (prebuilt index)
+Algorithm: HNSW 
 Language: Python
 Pipeline:
 
@@ -16,10 +16,9 @@ Today (fast demo, min-max):
 	1.	Stream → Crop → Embed → Query DB → Display results
 
 Later (full dataset):
-	•	Store → Build HNSW → Delete (for full dataset, optional for today)
+	•	Store → Build HNSW → Delete (for full dataset)
 
-Non-goals (today/demo): training, full dataset download, identity verification, cloud, FAISS, GUI
-
+Non-goals: training, full dataset download, identity verification, cloud, FAISS, GUI
 ⸻
 
 CLI Responsibilities (Min-Max Demo Today)
@@ -32,24 +31,27 @@ CLI Responsibilities (Min-Max Demo Today)
 
 doplgrep path/to/input.jpg path/to/demo_database.db [--top N] [-v]
 
-Optional flags:
-	•	--top N → number of matches to return (default 1)
-	•	-v → verbose output (paths + distance scores)
+Flags:
+	--mkdb = make database from inputs images directory into output directory
+	--mkidx = make HNSW index to speed up large similarity searches
+	--top N = number of matches to return (default 1)
+	-v → verbose output (paths + distance scores)
 
-Step-by-Step Fast Demo Workflow
 
-Step 1 – Prepare Environment (minutes):
-	•	Install Python & required libraries: torch, timm, Pillow, sqlite3, sqlite-vec.
-	•	No full dataset download today.
+Step-by-Step Workflow
 
-Step 2 – Prepare Prebuilt Demo Database (minutes):
-	•	Use a small subset (200–400k FFHQ images) and precompute embeddings + HNSW index.
+Step 1 – Prepare Environment:
+	Install Python & required libraries: pip install -e .
+	Log in with huggingface and request access to Dinov3
+
+Step 2 – Prepare Demo Database:
+	•	Demo uses 130k images -> precompute embeddings -> HNSW index
 	•	Store read-only SQLite vector DB for CLI testing.
-	•	This DB is delivered with demo — no need to build today.
 
-Step 3 – Run CLI (minutes):
-	•	Run doplgrep input.jpg demo_database.db
-	•	CLI loads model, embeds input, queries prebuilt DB, returns top matches.
+Step 3 – Run CLI:
+	Run doplgrep
+	Run doplgrep input.jpg demo_database.db
+	CLI loads model, embeds input, queries prebuilt DB, returns top matches.
 	•	Fast feedback; works entirely today.
 
 Step 4 – Optional: expand dataset later (hours/days):
