@@ -1,0 +1,1 @@
+2.091591 hour download time for mugshot images

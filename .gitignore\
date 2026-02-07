@@ -1,0 +1,26 @@
+# ===== Data =====
+*.png
+*.jpg
+*.jpeg
+data/
+embeddings/
+*.sqlite
+*.db
+*.idx
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ===== Packaging =====
+doplgrep.egg-info/
+dist/
+build/
+
+
+# ===== macos garbage stuff =====
+*.DS_Store
+._*
+__MACOSX/x
