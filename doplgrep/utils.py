@@ -8,6 +8,10 @@ from pathlib import Path
 from typing import Optional
 import mediapipe as mp
 
+#Iphone image support
+from pillow_heif import register_heif_opener
+register_heif_opener()
+
 class FaceDetector:
     """Face detection and cropping using MediaPipe."""
     
@@ -36,8 +40,9 @@ class FaceDetector:
         # Detect faces
         results = self.detector.process(img_np)
         
-        if not results.detections:
-            return None
+        if not results.detections: # Return original image if no face detected
+            print("No face detected in the image.")
+            return img_np  
         
         # Get first (most confident) face
         detection = results.detections[0]
@@ -64,24 +69,26 @@ class FaceDetector:
         cropped = image.crop((x1, y1, x2, y2))
         return cropped
 
+def open_image(image_path: str) -> Image.Image:
+    return Image.open(image_path).convert("RGB")
 
 
-def preprocess_image(image_path: str, size: int = 224) -> Image.Image:
-    """
-    Load and preprocess image for embedding.
+# def preprocess_image(img: Image.Image, size: int = 224) -> Image.Image:
+#     """
+#     Load and preprocess image for embedding.
     
-    Args:
-        image_path: Path to image file
+#     Args:
+#         img: PIL Image object
+#         size: Target size for the model to embed (default 224x224)
         
-    Returns:
-        PIL Image in RGB format cropped to standard size while maintaining aspect ratio
-    """
-    img = Image.open(image_path).convert("RGB")
-    img.thumbnail((size, size), Image.BILINEAR)
-    resized_img = Image.new("RGB", (size, size), (0, 0, 0))
-    resized_img.paste(img, ((size - img.width)//2, (size - img.height)//2))
+#     Returns:
+#         PIL Image in RGB format cropped to standard size while maintaining aspect ratio
+#     """
+#     img.thumbnail((size, size), Image.BILINEAR)
+#     resized_img = Image.new("RGB", (size, size), (0, 0, 0))
+#     resized_img.paste(img, ((size - img.width)//2, (size - img.height)//2))
 
-    return resized_img
+#     return resized_img
 
 def open_file(path: str) -> None:
     """Open a file with the default application (cross-platform)."""

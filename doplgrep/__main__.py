@@ -4,7 +4,7 @@ import argparse
 import subprocess
 from pathlib import Path
 import numpy as np
-from .utils import open_file
+from .utils import open_file, open_image, FaceDetector
 
 
 def main():
@@ -33,7 +33,7 @@ Examples:
     parser.add_argument(
         "--mkidx",
         action="store_true",
-        help="Build HNSW index from existing database (for 10K+ images)"
+        help="Build HNSW index from existing database (recommended for 10K+ images)"
     )
     parser.add_argument(
         "input",
@@ -58,7 +58,7 @@ Examples:
     parser.add_argument(
         "--open",
         action="store_true",
-        help="Automatically open top 3 matched images (macOS only)"
+        help="Automatically open top N matched images"
     )
     
     args = parser.parse_args()
@@ -120,8 +120,11 @@ def cmd_query(args):
     
     # Embed query image
     print(f"Embedding query image: {args.input}")
-    pil_image = preprocess_image(args.input)
-    query_embedding = embedder.embed(pil_image)
+    pil_image = open_image(args.input)
+    
+    detector = FaceDetector()
+    cropped_img = detector.detect_and_crop(pil_image)
+    query_embedding = embedder.embed(cropped_img)
     
     # Normalize
     query_embedding_np = query_embedding.cpu().numpy().flatten()
