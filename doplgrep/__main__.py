@@ -5,6 +5,9 @@ import subprocess
 from pathlib import Path
 import numpy as np
 from .utils import open_file, open_image, FaceDetector
+from .image_embedder import ImageEmbedder
+from .query_doppelganger import query_database_hnsw
+from .generate_embeddings import bug_squasher
 
 
 def main():
@@ -85,10 +88,12 @@ def cmd_mkdb(image_dir: str, db_path: str):
     print(f"Creating database from: {image_dir}")
     print(f"Output database: {db_path}\n")
     
+    bug_squasher(image_dir, "cmd_mkdb - image_dir")
+    bug_squasher(db_path, "cmd_mkdb - db_path")
     generate_embeddings(image_dir, db_path)
     
-    print(f"\nDatabase created successfully!")
-    print(f"doplgrep --mkidx {db_path}")
+    # print(f"\nDatabase created successfully!")
+    # print(f"doplgrep --mkidx {db_path}")
 
 
 def cmd_mkidx(db_path: str):
@@ -110,20 +115,15 @@ def cmd_mkidx(db_path: str):
 
 def cmd_query(args):
     """Query database for similar faces."""
-    from .image_embedder import ImageEmbedder
-    from .utils import preprocess_image
-    from .query_doppelganger import query_database_hnsw
+ 
     
     # Initialize embedder
     print("Loading DINOv3 model...")
     embedder = ImageEmbedder()
     
     # Embed query image
-    print(f"Embedding query image: {args.input}")
-    pil_image = open_image(args.input)
-    
-    detector = FaceDetector()
-    cropped_img = detector.detect_and_crop(pil_image)
+    print(f"Embedding query image: {args.input}")    
+    cropped_img = FaceDetector().detect_and_crop(args.input)
     query_embedding = embedder.embed(cropped_img)
     
     # Normalize

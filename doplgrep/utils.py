@@ -7,88 +7,91 @@ import platform
 from pathlib import Path
 from typing import Optional
 import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
+
+#Supress alerts 
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 #Iphone image support
 from pillow_heif import register_heif_opener
 register_heif_opener()
 
+
 class FaceDetector:
-    """Face detection and cropping using MediaPipe."""
-    
+    """Face detection using MediaPipe with separate detect and crop functions."""
+
     def __init__(self):
-        """Initialize MediaPipe face detection."""
-        self.mp_face_detection = mp.solutions.face_detection
-        self.detector = self.mp_face_detection.FaceDetection(
-            model_selection=1,  # 1 = full-range model (better for varied distances)
-            min_detection_confidence=0.5
+        """Initialize MediaPipe face detector."""
+        model_path = Path(__file__).parent / "blaze_face_short_range.tflite"
+        BaseOptions = mp.tasks.BaseOptions
+        FaceDetector = mp.tasks.vision.FaceDetector
+        FaceDetectorOptions = mp.tasks.vision.FaceDetectorOptions
+        VisionRunningMode = mp.tasks.vision.RunningMode
+
+        options = FaceDetectorOptions(
+            base_options=BaseOptions(model_asset_path=str(model_path)),
+            running_mode=VisionRunningMode.IMAGE
         )
+
+        self.detector = FaceDetector.create_from_options(options)
+
+    def detect_faces(self, mp_image: mp.Image) -> list:
+        """Return list of bounding boxes for faces detected in a MediaPipe image."""
+        result = self.detector.detect(mp_image)
+        if not result.detections:
+            return []
+        detection = result.detections[0]      
+        if not hasattr(detection, "bounding_box") or detection.bounding_box is None:
+            return [] 
+        bbx = detection.bounding_box  
+        x1 = int(bbx.origin_x)
+        y1 = int(bbx.origin_y)
+        x2 = x1 + int(bbx.width)
+        y2 = y1 + int(bbx.height)
+        return [x1, y1, x2, y2]
+
+    def crop_face(self, mp_image: mp.Image, bbox: list, padding: float = 0.2) -> Image.Image:
+        """Crop a face from a MediaPipe image and return as PIL.Image."""
+
+        h, w = mp_image.height, mp_image.width
+
+        # bbox is [x1, y1, x2, y2]
+        x1, y1, x2, y2 = bbox
+
+        # Add padding
+        pad_w = int((x2 - x1) * padding)
+        pad_h = int((y2 - y1) * padding)
+        x1 = max(0, x1 - pad_w)
+        y1 = max(0, y1 - pad_h)
+        x2 = min(w, x2 + pad_w)
+        y2 = min(h, y2 + pad_h)
+
+        # Convert MediaPipe image -> NumPy array for cropping
+        img_np = np.array(mp_image.numpy_view())  # HWC RGB uint8
+        cropped_np = img_np[y1:y2, x1:x2, :]
+
+        # Convert to PIL for DINOv3 embedding
+        pil_img = Image.fromarray(cropped_np)
+        pil_img.show()
+        return pil_img.convert("RGB")
+
+    def detect_and_crop(self, image_path: str, padding: float = 0.2) -> Optional[Image.Image]:
+        """Detect and crop the first face from an image file."""
+        mp_image = mp.Image.create_from_file(image_path)
+        bbx = self.detect_faces(mp_image)
+
+        if not bbx:
+            print("No face detected, returning original image.")
+            return open_image(image_path)
+
     
-    def detect_and_crop(self, image: Image.Image, padding: float = 0.2) -> Optional[Image.Image]:
-        """
-        Detect face and crop with padding.
-        
-        Args:
-            image: PIL Image
-            padding: Percentage padding around face bbox (0.2 = 20%)
-            
-        Returns:
-            Cropped face image, or None if no face detected
-        """
-        # Convert PIL to RGB numpy array
-        img_np = np.array(image)
-        
-        # Detect faces
-        results = self.detector.process(img_np)
-        
-        if not results.detections: # Return original image if no face detected
-            print("No face detected in the image.")
-            return img_np  
-        
-        # Get first (most confident) face
-        detection = results.detections[0]
-        bbox = detection.location_data.relative_bounding_box
-        
-        h, w = img_np.shape[:2]
-        
-        # Convert relative coords to absolute
-        x = int(bbox.xmin * w)
-        y = int(bbox.ymin * h)
-        box_w = int(bbox.width * w)
-        box_h = int(bbox.height * h)
-        
-        pad_w = int(box_w * padding)
-        pad_h = int(box_h * padding)
-        
-        #Ensure bbx stays inside image
-        x1 = max(0, x - pad_w)
-        y1 = max(0, y - pad_h)
-        x2 = min(w, x + box_w + pad_w)
-        y2 = min(h, y + box_h + pad_h)
-        
-        # Crop
-        cropped = image.crop((x1, y1, x2, y2))
-        return cropped
+        return self.crop_face(mp_image, bbx, padding=padding)
 
 def open_image(image_path: str) -> Image.Image:
     return Image.open(image_path).convert("RGB")
 
-
-# def preprocess_image(img: Image.Image, size: int = 224) -> Image.Image:
-#     """
-#     Load and preprocess image for embedding.
-    
-#     Args:
-#         img: PIL Image object
-#         size: Target size for the model to embed (default 224x224)
-        
-#     Returns:
-#         PIL Image in RGB format cropped to standard size while maintaining aspect ratio
-#     """
-#     img.thumbnail((size, size), Image.BILINEAR)
-#     resized_img = Image.new("RGB", (size, size), (0, 0, 0))
-#     resized_img.paste(img, ((size - img.width)//2, (size - img.height)//2))
-
-#     return resized_img
 
 def open_file(path: str) -> None:
     """Open a file with the default application (cross-platform)."""
@@ -119,3 +122,16 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
         Cosine similarity score (0-1)
     """
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+#test script
+if __name__ == "__main__":
+    # Example usage
+    img_path = "../input_images/dorian.heic"
+    
+    detector = FaceDetector()
+    cropped_img = detector.detect_and_crop(img_path)
+    
+    if cropped_img is not None:
+        cropped_img.show()
+
+

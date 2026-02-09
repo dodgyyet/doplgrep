@@ -4,8 +4,19 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from .image_embedder import ImageEmbedder
-from .utils import preprocess_image
+from .utils import FaceDetector, open_image
+from PIL import Image
+import traceback
+from itertools import chain
 
+#Bug squasher - remove later 
+def bug_squasher(x, where: str):
+    if isinstance(x, Path):
+        raise TypeError(f"[{where}] Expected str, got Path: {x}")
+    if isinstance(x, Image.Image):
+        raise TypeError(f"[{where}] Expected path or mp.Image, got PIL.Image")
+    if not isinstance(x, str):
+        raise TypeError(f"[{where}] Expected str, got {type(x)}")
 
 def create_vector_table(db_path: str) -> sqlite3.Connection:
     """Create SQLite table for storing embeddings."""
@@ -41,18 +52,19 @@ def generate_embeddings(image_dir: str, db_path: str) -> None:
     cursor = conn.cursor()
     
     # Find all images
-    image_paths = list(Path(image_dir).glob("**/*.png")) + \
-                  list(Path(image_dir).glob("**/*.jpg")) + \
-                  list(Path(image_dir).glob("**/*.jpeg"))
-    
-    print(f"Processing {len(image_paths)} images...")
+
+
+    exts = ["png", "jpg", "jpeg", "heic", "webp"]
+    image_paths = [str(p) for p in chain.from_iterable(Path(image_dir).rglob(f"*.{ext}") for ext in exts)]
     
     successful = 0
     for img_path in tqdm(image_paths):
         try:
             # Load and embed image
-            pil_image = preprocess_image(str(img_path))
-            embedding = embedder.embed(pil_image)
+            bug_squasher(img_path, "generate_embeddings - img_path")
+            detector = FaceDetector()
+            cropped_img = detector.detect_and_crop(img_path)
+            embedding = embedder.embed(cropped_img)
             
             # Convert to numpy and normalize
             embedding_np = embedding.cpu().numpy().flatten()
@@ -67,7 +79,9 @@ def generate_embeddings(image_dir: str, db_path: str) -> None:
             
         except Exception as e:
             print(f"\nError processing {img_path}: {e}")
-            continue
+            bug_squasher(img_path, "generate_embeddings - error img_path")
+            traceback.print_exc()
+            break
     
     conn.commit()
     conn.close()

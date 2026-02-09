@@ -20,7 +20,7 @@ def query_database_hnsw(db_path: str, query_embedding: np.ndarray, top_n: int = 
     index_path = db_path.replace('.sqlite', '.hnsw')
     
     if Path(index_path).exists():
-        print("⚡ Using HNSW index for fast search...")
+        print("Using HNSW index for fast search ...")
         from .vector_index import HNSWIndex
         
         index = HNSWIndex()
@@ -28,8 +28,6 @@ def query_database_hnsw(db_path: str, query_embedding: np.ndarray, top_n: int = 
         return index.query(query_embedding.reshape(1, -1), top_k=top_n)
     else:
         print("No HNSW index found, using brute-force search...")
-        print(f"For faster search on large datasets, run:")
-        print(f"doplgrep --mkidx {db_path}\n")
         return query_database_bruteforce(db_path, query_embedding, top_n)
 
 
