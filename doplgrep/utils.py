@@ -20,7 +20,7 @@ register_heif_opener()
 
 
 class FaceDetector:
-    """Face detection using MediaPipe with separate detect and crop functions."""
+    """Face detection using MediaPipe with EXIF-aware cropping."""
 
     def __init__(self):
         """Initialize MediaPipe face detector."""
@@ -52,43 +52,100 @@ class FaceDetector:
         y2 = y1 + int(bbx.height)
         return [x1, y1, x2, y2]
 
-    def crop_face(self, mp_image: mp.Image, bbox: list, padding: float = 0.2) -> Image.Image:
-        """Crop a face from a MediaPipe image and return as PIL.Image."""
-
-        h, w = mp_image.height, mp_image.width
+    def crop_face(self, pil_image: Image.Image, bbox: list, 
+                  padding_top: float = 0.8, 
+                  padding_sides: float = 0.4, 
+                  padding_bottom: float = 0.1) -> Image.Image:
+        """
+        Crop a face from a PIL Image with asymmetric padding.
+        
+        Args:
+            pil_image: PIL Image (already rotated correctly via EXIF)
+            bbox: Bounding box [x1, y1, x2, y2]
+            padding_top: Padding multiplier for top (default 0.8 = 80% extra for hair)
+            padding_sides: Padding multiplier for left/right (default 0.4)
+            padding_bottom: Padding multiplier for bottom (default 0.3)
+            
+        Returns:
+            PIL Image in RGB format
+        """
+        w, h = pil_image.size  # PIL uses (width, height)
 
         # bbox is [x1, y1, x2, y2]
         x1, y1, x2, y2 = bbox
+        
+        face_width = x2 - x1
+        face_height = y2 - y1
 
-        # Add padding
-        pad_w = int((x2 - x1) * padding)
-        pad_h = int((y2 - y1) * padding)
+        # Asymmetric padding - MUCH more on top for hair and forehead
+        pad_w = int(face_width * padding_sides)
+        pad_h_top = int(face_height * padding_top)
+        pad_h_bottom = int(face_height * padding_bottom)
+        
         x1 = max(0, x1 - pad_w)
-        y1 = max(0, y1 - pad_h)
+        y1 = max(0, y1 - pad_h_top)
         x2 = min(w, x2 + pad_w)
-        y2 = min(h, y2 + pad_h)
+        y2 = min(h, y2 + pad_h_bottom)
 
-        # Convert MediaPipe image -> NumPy array for cropping
-        img_np = np.array(mp_image.numpy_view())  # HWC RGB uint8
-        cropped_np = img_np[y1:y2, x1:x2, :]
+        # Crop the PIL image directly (no numpy conversion needed)
+        cropped = pil_image.crop((x1, y1, x2, y2))
+        
+        # Ensure RGB format
+        return cropped.convert("RGB")
 
-        # Convert to PIL for DINOv3 embedding
-        pil_img = Image.fromarray(cropped_np)
-        pil_img.show()
-        return pil_img.convert("RGB")
-
-    def detect_and_crop(self, image_path: str, padding: float = 0.2) -> Optional[Image.Image]:
-        """Detect and crop the first face from an image file."""
-        mp_image = mp.Image.create_from_file(image_path)
+    def detect_and_crop(self, image_path: str, 
+                       padding_top: float = 0.8,
+                       padding_sides: float = 0.4,
+                       padding_bottom: float = 0.3,
+                       fallback_to_full: bool = True) -> Optional[Image.Image]:
+        """
+        Detect and crop the first face from an image file.
+        FIXED: Now handles EXIF rotation properly to prevent 270° rotation.
+        
+        Args:
+            image_path: Path to image file
+            padding_top: Extra space above face (0.8 = 80% of face height for hair)
+            padding_sides: Extra space on left/right (0.4 = 40%)
+            padding_bottom: Extra space below face (0.3 = 30%)
+            fallback_to_full: If no face detected, return full image (vs None)
+            
+        Returns:
+            Cropped face as PIL Image, or full image if no face detected
+        """
+        from PIL import ImageOps
+        
+        # Load image with PIL first and handle EXIF rotation
+        pil_image = Image.open(image_path)
+        
+        # CRITICAL FIX: Handle EXIF orientation (fixes 270° rotation)
+        pil_image = ImageOps.exif_transpose(pil_image)
+        if pil_image is None:  # If no EXIF, exif_transpose returns None
+            pil_image = Image.open(image_path)
+        
+        # Convert to RGB to ensure 3 channels
+        pil_image = pil_image.convert("RGB")
+        
+        # Now convert to MediaPipe format for face detection
+        # We'll use the PIL image directly for cropping to preserve orientation
+        img_np = np.array(pil_image)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_np)
+        
+        # Detect face
         bbx = self.detect_faces(mp_image)
 
         if not bbx:
-            print("No face detected, returning original image.")
-            return open_image(image_path)
+            if fallback_to_full:
+                print(f"No face detected in {image_path}, using full image")
+                return pil_image
+            else:
+                return None
 
+        # Crop using PIL image (not MediaPipe) to preserve correct orientation
+        return self.crop_face(pil_image, bbx, 
+                            padding_top=padding_top,
+                            padding_sides=padding_sides, 
+                            padding_bottom=padding_bottom)
     
-        return self.crop_face(mp_image, bbx, padding=padding)
-
 def open_image(image_path: str) -> Image.Image:
     return Image.open(image_path).convert("RGB")
 
