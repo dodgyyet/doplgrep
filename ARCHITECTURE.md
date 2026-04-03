@@ -1,59 +1,53 @@
-Name: Doplgrep CLI Tool (Min-Max Demo)
-Platform: macOS (Apple Silicon)
-Disk: ~2 TB available
-Demo dataset: ipoc_mugshots
-Input constraint: single, unblurred faces only, not AI generated, not celebs, clean background
-Model: DINOv3 ViT-L
-Inference: PyTorch MPS, bf16
-Embedding: 1024-dimensional
-Vector DB: SQLite + sqlite-vec 
-Distance metric: cosine
-Algorithm: HNSW 
-Language: Python
-Pipeline:
+# Architecture Overview
 
-Today (fast demo, min-max):
-	1.	Stream → Crop → Embed → Query DB → Display results
+## Project Scope
 
-Later (full dataset):
-	•	Store → Build HNSW → Delete (for full dataset)
+- Name: `doplgrep`
+- Type: Local novelty CLI for face similarity matching
+- Language: Python
+- Runtime target: macOS (Apple Silicon) and Linux
+- Non-goals: model training, identity verification, cloud deployment, GUI
 
-Non-goals: training, full dataset download, identity verification, cloud, FAISS, GUI
-⸻
+## Core Stack
 
-CLI Responsibilities (Min-Max Demo Today)
-	1.	Load DINOv3 ViT-L model on MPS (bf16).
-	2.	Preprocess input image (crop + resize to 224×224).
-	3.	Embed face into 1024-dimensional vector.
-	4.	Query prebuilt SQLite vector DB (sqlite-vec) using cosine + HNSW.
-	5.	Return top-N matches to console (paths + cosine distance)
-	6.	Open matched image(s) automatically (optional for demo).
+- Embedding model: DINOv3 ViT-L (`facebook/dinov3-vitl16-pretrain-lvd1689m`)
+- Face detection: MediaPipe Face Detector
+- Vector storage: SQLite (`face_embeddings` table)
+- Fast retrieval: HNSW (`hnswlib` index file)
+- Similarity metric: cosine
 
-doplgrep path/to/input.jpg path/to/demo_database.db [--top N] [-v]
+## Pipeline
 
-Flags:
-	--mkdb = make database from inputs images directory into output directory
-	--mkidx = make HNSW index to speed up large similarity searches
-	--top N = number of matches to return (default 1)
-	-v → verbose output (paths + distance scores)
+### Build Database (`--mkdb`)
+1. Recursively load images from an input directory.
+2. Detect and crop the primary face.
+3. Generate a 1024-d embedding.
+4. Normalize embedding.
+5. Store image path + embedding bytes in SQLite.
 
+### Build Index (`--mkidx`)
+1. Read embeddings from SQLite.
+2. Build HNSW graph.
+3. Save `.hnsw` index next to the SQLite database.
 
-Step-by-Step Workflow
+### Query
+1. Load and crop query image.
+2. Generate and normalize query embedding.
+3. Search via HNSW when index exists.
+4. Fallback to brute-force cosine search when no index exists.
+5. Return top-N matches.
 
-Step 1 – Prepare Environment:
-	Install Python & required libraries: pip install -e .
-	Log in with huggingface and request access to Dinov3
+## CLI Surface
 
-Step 2 – Prepare Demo Database:
-	•	Demo uses 130k images -> precompute embeddings -> HNSW index
-	•	Store read-only SQLite vector DB for CLI testing.
+```bash
+doplgrep --mkdb <image_dir> <output_db>
+doplgrep --mkidx <database.sqlite>
+doplgrep <query_image> <database.sqlite> --top <N> [-v] [--open]
+```
 
-Step 3 – Run CLI:
-	Run doplgrep
-	Run doplgrep input.jpg demo_database.db
-	CLI loads model, embeds input, queries prebuilt DB, returns top matches.
-	•	Fast feedback; works entirely today.
+## Dataset Notes
 
-Step 4 – Optional: expand dataset later (hours/days):
-	•	Download larger FFHQ or LAION-Face subset
-	•	Recompute embeddings, rebuild HNSW, update SQLite DB
+This project is dataset agnostic. Any image collection can be used as a local face database.
+
+Example source used during development:
+- [https://huggingface.co/datasets/bitmind/idoc-mugshots-images](https://huggingface.co/datasets/bitmind/idoc-mugshots-images)
