@@ -13,7 +13,7 @@ from .generate_embeddings import bug_squasher
 def main():
     """Main CLI entry point with subcommand routing."""
     parser = argparse.ArgumentParser(
-        description="doplgrep - Customizable face doppelganger search CLI tool",
+        description="doplgrep -> Local CLI for face similarity search on custom image sets",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -66,7 +66,7 @@ Examples:
     
     args = parser.parse_args()
     
-    # Route to appropriate function
+    # Route to the selected workflow
     if args.mkdb:
         if not args.output:
             parser.error("--mkdb requires both <image_dir> and <output_db>")

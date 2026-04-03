@@ -10,11 +10,10 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-#Supress alerts 
-import os
+# Reduce TensorFlow log noise from MediaPipe dependencies.
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-#Iphone image support
+# Enable iPhone HEIC image support.
 from pillow_heif import register_heif_opener
 register_heif_opener()
 
@@ -77,7 +76,7 @@ class FaceDetector:
         face_width = x2 - x1
         face_height = y2 - y1
 
-        # Asymmetric padding - MUCH more on top for hair and forehead
+        # Asymmetric padding keeps more forehead and hair in frame.
         pad_w = int(face_width * padding_sides)
         pad_h_top = int(face_height * padding_top)
         pad_h_bottom = int(face_height * padding_bottom)
@@ -100,7 +99,7 @@ class FaceDetector:
                        fallback_to_full: bool = True) -> Optional[Image.Image]:
         """
         Detect and crop the first face from an image file.
-        FIXED: Now handles EXIF rotation properly to prevent 270° rotation.
+        Handles EXIF rotation to avoid orientation issues.
         
         Args:
             image_path: Path to image file
@@ -117,7 +116,7 @@ class FaceDetector:
         # Load image with PIL first and handle EXIF rotation
         pil_image = Image.open(image_path)
         
-        # CRITICAL FIX: Handle EXIF orientation (fixes 270° rotation)
+        # Handle EXIF orientation before face detection.
         pil_image = ImageOps.exif_transpose(pil_image)
         if pil_image is None:  # If no EXIF, exif_transpose returns None
             pil_image = Image.open(image_path)
@@ -125,8 +124,7 @@ class FaceDetector:
         # Convert to RGB to ensure 3 channels
         pil_image = pil_image.convert("RGB")
         
-        # Now convert to MediaPipe format for face detection
-        # We'll use the PIL image directly for cropping to preserve orientation
+        # Convert to MediaPipe image for detection and keep PIL for crop fidelity.
         img_np = np.array(pil_image)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_np)
         
@@ -140,7 +138,7 @@ class FaceDetector:
             else:
                 return None
 
-        # Crop using PIL image (not MediaPipe) to preserve correct orientation
+        # Crop from the EXIF-corrected PIL image.
         return self.crop_face(pil_image, bbx, 
                             padding_top=padding_top,
                             padding_sides=padding_sides, 
@@ -180,7 +178,7 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     """
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-#test script
+# Local test script
 if __name__ == "__main__":
     # Example usage
     img_path = "../input_images/dorian.heic"
@@ -190,5 +188,4 @@ if __name__ == "__main__":
     
     if cropped_img is not None:
         cropped_img.show()
-
 

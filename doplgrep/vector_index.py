@@ -49,7 +49,7 @@ class HNSWIndex:
         print(f"Building HNSW index for {len(embeddings)} vectors...")
         embeddings_np = np.array(embeddings)
         self.index.add_items(embeddings_np, ids)
-        print("✓ HNSW index built!")
+        print("HNSW index built.")
     
     def query(self, query_embedding: np.ndarray, top_k: int = 5) -> list:
         """
@@ -76,7 +76,7 @@ class HNSWIndex:
     def save(self, path: str):
         """Save index to disk."""
         self.index.save_index(path)
-        print(f"✓ Index saved to {path}")
+        print(f"Index saved to {path}")
     
     def load(self, path: str, db_path: str):
         """Load index from disk."""
@@ -89,4 +89,4 @@ class HNSWIndex:
         self.id_to_path = {row[0]: row[1] for row in cursor.fetchall()}
         conn.close()
         
-        print(f"✓ Index loaded from {path}")
+        print(f"Index loaded from {path}")

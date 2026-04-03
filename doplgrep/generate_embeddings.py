@@ -9,7 +9,7 @@ from PIL import Image
 import traceback
 from itertools import chain
 
-#Bug squasher - remove later 
+# Runtime type guard used by CLI flows.
 def bug_squasher(x, where: str):
     if isinstance(x, Path):
         raise TypeError(f"[{where}] Expected str, got Path: {x}")

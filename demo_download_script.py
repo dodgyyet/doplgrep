@@ -4,14 +4,14 @@ import random
 import time
 from PIL import Image
 
-# Number of images to download for demo
-NUM_IMAGES = 5000  # Set None for full dataset (~130k) if you want to thug out 1-3 hours
+# Number of images to download for a local demo run.
+NUM_IMAGES = 5000  # Set None for full dataset (~130k), which may take 1-3 hours.
 
-# Directory to save images
+# Directory to save downloaded images.
 SAVE_DIR = "mugshots"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-# Load dataset (train split)
+# Example dataset source used during development.
 ds = load_dataset("bitmind/idoc-mugshots-images", split="train")
 
 # Shuffle indices and take NUM_IMAGES
